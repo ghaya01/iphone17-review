@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>iPhone 17 Pro Max – Review</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 :root {
@@ -223,7 +224,6 @@ body { font-family: -apple-system,'SF Pro Display','Segoe UI',sans-serif; backgr
       <div class="emoji-row">
         <div class="e-btn" onclick="selEmoji(this,'😍','Love it')"><span class="ei">😍</span><span class="el">Love it</span></div>
         <div class="e-btn" onclick="selEmoji(this,'👍','Good')"><span class="ei">👍</span><span class="el">Good</span></div>
-        <div class="e-btn" onclick="selEmoji(this,'😐','Okay')"><span class="ei">😐</span><span class="el">Okay</span></div>
         <div class="e-btn" onclick="selEmoji(this,'👎','Bad')"><span class="ei">👎</span><span class="el">Bad</span></div>
         <div class="e-btn" onclick="selEmoji(this,'😡','Hate it')"><span class="ei">😡</span><span class="el">Hate it</span></div>
       </div>
@@ -288,12 +288,19 @@ body { font-family: -apple-system,'SF Pro Display','Segoe UI',sans-serif; backgr
       <div class="d-stat pos"><div class="n" id="dPos">0</div><div class="l">😊 Positive</div></div>
       <div class="d-stat neg"><div class="n" id="dNeg">0</div><div class="l">😞 Negative</div></div>
     </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+      <div class="d-chart">
+        <h3>Sentiment Distribution</h3>
+        <canvas id="sentimentChart" style="max-height:250px;"></canvas>
+      </div>
+      <div class="d-chart">
+        <h3>Rating Stars</h3>
+        <canvas id="ratingChart" style="max-height:250px;"></canvas>
+      </div>
+    </div>
     <div class="d-chart">
-      <h3>Sentiment Distribution</h3>
-      <div class="bar-row"><span class="bar-lbl">😊 Positive</span><div class="bar-track"><div class="bar-fill bf-pos" id="bPos" style="width:0%"><span id="pPct">0%</span></div></div></div>
-      <div class="bar-row"><span class="bar-lbl">😞 Negative</span><div class="bar-track"><div class="bar-fill bf-neg" id="bNeg" style="width:0%"><span id="nPct">0%</span></div></div></div>
-      <div style="margin-top:20px;text-align:center">
-        <div style="font-size:11px;font-weight:700;color:#636366;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Average Rating</div>
+      <h3 style="text-align:center;">Average Rating</h3>
+      <div style="text-align:center;">
         <div style="font-size:44px;font-weight:800;color:#FFD60A" id="avgR">—</div>
         <div style="font-size:18px;color:#FFD60A" id="avgS"></div>
       </div>
@@ -307,11 +314,32 @@ body { font-family: -apple-system,'SF Pro Display','Segoe UI',sans-serif; backgr
   </div>
 </div>
 
+<!-- REVIEWS SECTION IN MAIN PAGE -->
+<div id="mainReviews" style="max-width:600px; margin:40px auto; padding:0 16px; display:none;">
+  <div style="margin-bottom:20px;">
+    <h2 style="font-size:18px; font-weight:700; color:#1C1C1E; margin-bottom:4px;">📝 Student Reviews</h2>
+    <p style="font-size:13px; color:#636366;">See what students think about the iPhone 17 Pro Max</p>
+  </div>
+  <div id="mainReviewsList"></div>
+</div>
+
+<!-- LOGIN POPUP FOR ADMIN -->
+<div id="loginView" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:white; border-radius:24px; padding:40px; width:90%; max-width:350px; text-align:center;">
+    <h2 style="color:#1C1C1E; font-size:20px; font-weight:800; margin-bottom:12px;">🔒 Teacher Access</h2>
+    <p style="color:#636366; font-size:13px; margin-bottom:20px;">Enter password to view dashboard</p>
+    <input id="pwdInput" type="password" placeholder="Password" style="width:100%; padding:14px; border:2px solid #E5E5EA; border-radius:12px; font-size:14px; margin-bottom:16px; outline:none; font-family:inherit;" />
+    <button onclick="checkPassword()" style="width:100%; padding:14px; background:#0A84FF; color:white; border:none; border-radius:12px; font-weight:700; cursor:pointer; font-size:15px;">Sign In</button>
+    <button onclick="closePwd()" style="width:100%; padding:12px; background:#F2F2F7; color:#1C1C1E; border:none; border-radius:12px; font-weight:600; cursor:pointer; margin-top:10px;">← Back</button>
+  </div>
+</div>
+
 <!-- FLOATING DASHBOARD BUTTON -->
 <button id="dashBtn" onclick="openDash()">📊 Dashboard</button>
 
 <script>
 const RK = 'iphone17_reviews';
+const ADMIN_PWD = '12345';
 let selEmojiData = null, selStars = 0, selAspects = [];
 
 function selEmoji(el, e, l) {
@@ -332,7 +360,7 @@ function togAsp(el) {
 function updChar() {
   const v = document.getElementById('revText').value;
   document.getElementById('charN').textContent = v.length;
-  document.getElementById('charHint').textContent = v.length < 10 ? 'Write at least 10 characters' : '';
+  document.getElementById('charHint').textContent = '';
 }
 
 function analyzeSentiment(text, stars, emoji) {
@@ -362,7 +390,7 @@ function doSubmit() {
   const text = document.getElementById('revText').value.trim();
   if (!selEmojiData) { alert('Please select how you feel!'); return; }
   if (!selStars)     { alert('Please give a star rating!'); return; }
-  if (text.length < 10) { alert('Please write at least 10 characters!'); return; }
+  if (text.length < 1) { alert('Please write a review!'); return; }
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Analyzing sentiment...';
@@ -378,6 +406,7 @@ function doSubmit() {
     document.getElementById('mainView').style.display = 'none';
     document.getElementById('dashBtn').style.display = 'none';
     document.getElementById('successView').style.display = 'flex';
+    updateMainReviews();
   }, 1600);
 }
 
@@ -392,15 +421,34 @@ function resetForm() {
   document.getElementById('successView').style.display = 'none';
   document.getElementById('dashBtn').style.display = 'block';
   window.scrollTo(0,0);
+  updateMainReviews();
 }
 
 function openDash() {
-  loadDash();
-  document.getElementById('mainView').style.display = 'none';
-  document.getElementById('successView').style.display = 'none';
-  document.getElementById('dashView').style.display = 'block';
-  document.getElementById('dashBtn').style.display = 'none';
+  document.getElementById('loginView').style.display = 'flex';
 }
+
+function closePwd() {
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('pwdInput').value = '';
+}
+
+function checkPassword() {
+  const pwd = document.getElementById('pwdInput').value;
+  if (pwd === ADMIN_PWD) {
+    loadDash();
+    document.getElementById('mainView').style.display = 'none';
+    document.getElementById('successView').style.display = 'none';
+    document.getElementById('dashView').style.display = 'block';
+    document.getElementById('loginView').style.display = 'none';
+    document.getElementById('dashBtn').style.display = 'none';
+    document.getElementById('pwdInput').value = '';
+  } else {
+    alert('❌ Wrong password!');
+    document.getElementById('pwdInput').value = '';
+  }
+}
+
 function closeDash() {
   document.getElementById('dashView').style.display = 'none';
   document.getElementById('mainView').style.display = 'block';
@@ -412,20 +460,117 @@ function loadDash() {
   const total = reviews.length;
   const pos   = reviews.filter(r => r.cls === 'pos').length;
   const neg   = reviews.filter(r => r.cls === 'neg').length;
+  const neu   = reviews.filter(r => r.cls === 'neu').length;
+  
   document.getElementById('dTotal').textContent = total;
   document.getElementById('dPos').textContent   = pos;
   document.getElementById('dNeg').textContent   = neg;
-  const pp = total ? Math.round(pos/total*100) : 0;
-  const np = total ? Math.round(neg/total*100) : 0;
-  document.getElementById('bPos').style.width = pp + '%';
-  document.getElementById('bNeg').style.width = np + '%';
-  document.getElementById('pPct').textContent = pp + '%';
-  document.getElementById('nPct').textContent = np + '%';
+  
   const avg = total ? (reviews.reduce((s,r) => s+r.stars, 0)/total).toFixed(1) : null;
   document.getElementById('avgR').textContent = avg || '—';
   document.getElementById('avgS').textContent = avg ? '⭐'.repeat(Math.round(avg)) : '';
+  
   const cont = document.getElementById('rList');
   if (!total) { cont.innerHTML = '<div class="empty"><span>📭</span><p>No reviews yet. Share this page with students!</p></div>'; return; }
+  cont.innerHTML = [...reviews].reverse().map(r => `
+    <div class="r-item ${r.cls}">
+      <div class="r-top">
+        <span class="r-stars">${'⭐'.repeat(r.stars)}</span>
+        <span class="r-badge rb-${r.cls}">${r.cls === 'pos' ? '😊 Positive' : r.cls === 'neg' ? '😞 Negative' : '😐 Neutral'}</span>
+      </div>
+      ${r.emoji ? `<div style="font-size:16px;margin-bottom:6px">${r.emoji.e} ${r.emoji.l}</div>` : ''}
+      ${r.aspects && r.aspects.length ? `<div style="font-size:11px;color:#0A84FF;margin-bottom:6px">${r.aspects.join(' · ')}</div>` : ''}
+      <p>${r.text}</p>
+      <div class="r-time">⏰ ${r.time}</div>
+    </div>`).join('');
+  
+  // Create Charts
+  createSentimentChart(pos, neg, neu);
+  createRatingChart(reviews);
+}
+
+function createSentimentChart(pos, neg, neu) {
+  const ctx = document.getElementById('sentimentChart').getContext('2d');
+  if (window.sentimentChartInstance) window.sentimentChartInstance.destroy();
+  
+  window.sentimentChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['😊 Positive', '😞 Negative', '😐 Neutral'],
+      datasets: [{
+        data: [pos, neg, neu],
+        backgroundColor: ['#30D158', '#FF453A', '#FFD60A'],
+        borderColor: ['#30D158', '#FF453A', '#FFD60A'],
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            font: { size: 12, weight: 'bold' },
+            padding: 15
+          }
+        }
+      }
+    }
+  });
+}
+
+function createRatingChart(reviews) {
+  const ratingCounts = [0, 0, 0, 0, 0];
+  reviews.forEach(r => {
+    if (r.stars >= 1 && r.stars <= 5) {
+      ratingCounts[r.stars - 1]++;
+    }
+  });
+  
+  const ctx = document.getElementById('ratingChart').getContext('2d');
+  if (window.ratingChartInstance) window.ratingChartInstance.destroy();
+  
+  window.ratingChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['1 ⭐', '2 ⭐', '3 ⭐', '4 ⭐', '5 ⭐'],
+      datasets: [{
+        label: 'Count',
+        data: ratingCounts,
+        backgroundColor: ['#FF453A', '#FF9500', '#FFD60A', '#34C759', '#30D158'],
+        borderColor: ['#FF453A', '#FF9500', '#FFD60A', '#34C759', '#30D158'],
+        borderWidth: 2,
+        borderRadius: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: { stepSize: 1 }
+        }
+      }
+    }
+  });
+}
+
+function updateMainReviews() {
+  const reviews = JSON.parse(localStorage.getItem(RK) || '[]');
+  const cont = document.getElementById('mainReviewsList');
+  
+  if (reviews.length === 0) {
+    document.getElementById('mainReviews').style.display = 'none';
+    return;
+  }
+  
+  document.getElementById('mainReviews').style.display = 'block';
   cont.innerHTML = [...reviews].reverse().map(r => `
     <div class="r-item ${r.cls}">
       <div class="r-top">
@@ -440,8 +585,11 @@ function loadDash() {
 }
 
 function clearAll() {
-  if (confirm('Delete all reviews?')) { localStorage.removeItem(RK); loadDash(); }
+  if (confirm('Delete all reviews?')) { localStorage.removeItem(RK); loadDash(); updateMainReviews(); }
 }
+
+// Load reviews on page load
+document.addEventListener('DOMContentLoaded', updateMainReviews);
 </script>
 </body>
 </html>

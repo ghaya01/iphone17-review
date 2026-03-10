@@ -341,15 +341,14 @@ body { font-family: -apple-system,'SF Pro Display','Segoe UI',sans-serif; backgr
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-// ✅ استبدل هذه القيم بقيمك من Firebase Console
 const firebaseConfig = {
-  apiKey: "REPLACE_YOUR_API_KEY",
-  authDomain: "REPLACE.firebaseapp.com",
-  databaseURL: "https://REPLACE-default-rtdb.firebaseio.com",
-  projectId: "REPLACE",
-  storageBucket: "REPLACE.appspot.com",
-  messagingSenderId: "REPLACE",
-  appId: "REPLACE"
+  apiKey: "AIzaSyBgrmKlYm188g-rFS81eO9HS7ayPRHXGcs",
+  authDomain: "iphone17-review.firebaseapp.com",
+  databaseURL: "https://iphone17-review-default-rtdb.firebaseio.com",
+  projectId: "iphone17-review",
+  storageBucket: "iphone17-review.firebasestorage.app",
+  messagingSenderId: "152291405122",
+  appId: "1:152291405122:web:e0da0c2dcb2a1ec20eecdb"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -360,19 +359,14 @@ const ADMIN_PWD = '12345';
 let selEmojiData = null, selStars = 0, selAspects = [];
 let allReviews = [];
 
-// 🔴 Real-time listener — يحدّث فور وصول تعليق جديد من أي طالب
+// 🔴 Real-time — يحدّث فور وصول أي تعليق من أي طالب
 onValue(reviewsRef, (snapshot) => {
   allReviews = [];
   if (snapshot.exists()) {
-    snapshot.forEach(child => {
-      allReviews.push({ id: child.key, ...child.val() });
-    });
+    snapshot.forEach(child => allReviews.push({ id: child.key, ...child.val() }));
   }
   renderMainReviews();
-  // إذا كانت لوحة التحكم مفتوحة، حدّثها تلقائياً
-  if (document.getElementById('dashView').style.display === 'block') {
-    renderDash();
-  }
+  if (document.getElementById('dashView').style.display === 'block') renderDash();
 });
 
 function selEmoji(el, e, l) {
@@ -404,14 +398,8 @@ function updChar() {
 window.updChar = updChar;
 
 function analyzeSentiment(text, stars, emoji) {
-  const pos = ['amazing','excellent','great','good','love','best','fantastic','wonderful',
-               'perfect','helpful','clear','recommend','outstanding','superb','awesome',
-               'impressive','beautiful','nice','happy','satisfied','incredible','brilliant',
-               'fast','smooth','sharp','stunning','gorgeous','powerful','innovative'];
-  const neg = ['terrible','bad','worst','waste','boring','poor','horrible','disappointing',
-               'useless','slow','hot','overheating','expensive','overpriced','fragile',
-               'hate','awful','frustrating','broken','regret','heavy','ugly','blurry',
-               'battery','drain','crash','lag','scratch'];
+  const pos = ['amazing','excellent','great','good','love','best','fantastic','wonderful','perfect','helpful','clear','recommend','outstanding','superb','awesome','impressive','beautiful','nice','happy','satisfied','incredible','brilliant','fast','smooth','sharp','stunning','gorgeous','powerful','innovative'];
+  const neg = ['terrible','bad','worst','waste','boring','poor','horrible','disappointing','useless','slow','hot','overheating','expensive','overpriced','fragile','hate','awful','frustrating','broken','regret','heavy','ugly','blurry','battery','drain','crash','lag','scratch'];
   const t = text.toLowerCase();
   let sc = 0;
   pos.forEach(w => { if(t.includes(w)) sc += 1; });
@@ -436,17 +424,12 @@ async function doSubmit() {
   btn.innerHTML = '<span class="spinner"></span> Analyzing sentiment...';
   setTimeout(async () => {
     const s = analyzeSentiment(text, selStars, selEmojiData);
-    // ✅ احفظ في Firebase بدلاً من localStorage
     await push(reviewsRef, {
-      text,
-      stars: selStars,
-      emoji: selEmojiData,
-      aspects: [...selAspects],
-      sentiment: s.label,
-      cls: s.cls,
+      text, stars: selStars, emoji: selEmojiData,
+      aspects: [...selAspects], sentiment: s.label, cls: s.cls,
       time: new Date().toLocaleTimeString()
     });
-    const bc = s.cls === 'pos' ? 's-pos' : s.cls === 'neg' ? 's-neg' : 's-neu';
+    const bc = s.cls==='pos'?'s-pos':s.cls==='neg'?'s-neg':'s-neu';
     document.getElementById('sResult').innerHTML = `<div class="s-badge ${bc}">${s.emoji} ${s.label} Sentiment Detected</div>`;
     btn.disabled = false;
     btn.innerHTML = '🤖 Analyze & Submit';
@@ -471,9 +454,7 @@ function resetForm() {
 }
 window.resetForm = resetForm;
 
-function openDash() {
-  document.getElementById('loginView').style.display = 'flex';
-}
+function openDash() { document.getElementById('loginView').style.display = 'flex'; }
 window.openDash = openDash;
 
 function closePwd() {
@@ -509,13 +490,13 @@ window.closeDash = closeDash;
 function renderDash() {
   const reviews = allReviews;
   const total = reviews.length;
-  const pos   = reviews.filter(r => r.cls === 'pos').length;
-  const neg   = reviews.filter(r => r.cls === 'neg').length;
-  const neu   = reviews.filter(r => r.cls === 'neu').length;
+  const pos = reviews.filter(r => r.cls==='pos').length;
+  const neg = reviews.filter(r => r.cls==='neg').length;
+  const neu = reviews.filter(r => r.cls==='neu').length;
   document.getElementById('dTotal').textContent = total;
-  document.getElementById('dPos').textContent   = pos;
-  document.getElementById('dNeg').textContent   = neg;
-  const avg = total ? (reviews.reduce((s,r) => s+r.stars, 0)/total).toFixed(1) : null;
+  document.getElementById('dPos').textContent = pos;
+  document.getElementById('dNeg').textContent = neg;
+  const avg = total ? (reviews.reduce((s,r)=>s+r.stars,0)/total).toFixed(1) : null;
   document.getElementById('avgR').textContent = avg || '—';
   document.getElementById('avgS').textContent = avg ? '⭐'.repeat(Math.round(avg)) : '';
   const cont = document.getElementById('rList');
@@ -524,10 +505,10 @@ function renderDash() {
     <div class="r-item ${r.cls}">
       <div class="r-top">
         <span class="r-stars">${'⭐'.repeat(r.stars)}</span>
-        <span class="r-badge rb-${r.cls}">${r.cls === 'pos' ? '😊 Positive' : r.cls === 'neg' ? '😞 Negative' : '😐 Neutral'}</span>
+        <span class="r-badge rb-${r.cls}">${r.cls==='pos'?'😊 Positive':r.cls==='neg'?'😞 Negative':'😐 Neutral'}</span>
       </div>
-      ${r.emoji ? `<div style="font-size:16px;margin-bottom:6px">${r.emoji.e} ${r.emoji.l}</div>` : ''}
-      ${r.aspects && r.aspects.length ? `<div style="font-size:11px;color:#0A84FF;margin-bottom:6px">${r.aspects.join(' · ')}</div>` : ''}
+      ${r.emoji?`<div style="font-size:16px;margin-bottom:6px">${r.emoji.e} ${r.emoji.l}</div>`:''}
+      ${r.aspects&&r.aspects.length?`<div style="font-size:11px;color:#0A84FF;margin-bottom:6px">${r.aspects.join(' · ')}</div>`:''}
       <p>${r.text}</p>
       <div class="r-time">⏰ ${r.time}</div>
     </div>`).join('');
@@ -538,19 +519,16 @@ function renderDash() {
 function renderMainReviews() {
   const reviews = allReviews;
   const cont = document.getElementById('mainReviewsList');
-  if (reviews.length === 0) {
-    document.getElementById('mainReviews').style.display = 'none';
-    return;
-  }
+  if (!reviews.length) { document.getElementById('mainReviews').style.display = 'none'; return; }
   document.getElementById('mainReviews').style.display = 'block';
   cont.innerHTML = [...reviews].reverse().map(r => `
     <div class="r-item ${r.cls}">
       <div class="r-top">
         <span class="r-stars">${'⭐'.repeat(r.stars)}</span>
-        <span class="r-badge rb-${r.cls}">${r.cls === 'pos' ? '😊 Positive' : r.cls === 'neg' ? '😞 Negative' : '😐 Neutral'}</span>
+        <span class="r-badge rb-${r.cls}">${r.cls==='pos'?'😊 Positive':r.cls==='neg'?'😞 Negative':'😐 Neutral'}</span>
       </div>
-      ${r.emoji ? `<div style="font-size:16px;margin-bottom:6px">${r.emoji.e} ${r.emoji.l}</div>` : ''}
-      ${r.aspects && r.aspects.length ? `<div style="font-size:11px;color:#0A84FF;margin-bottom:6px">${r.aspects.join(' · ')}</div>` : ''}
+      ${r.emoji?`<div style="font-size:16px;margin-bottom:6px">${r.emoji.e} ${r.emoji.l}</div>`:''}
+      ${r.aspects&&r.aspects.length?`<div style="font-size:11px;color:#0A84FF;margin-bottom:6px">${r.aspects.join(' · ')}</div>`:''}
       <p>${r.text}</p>
       <div class="r-time">⏰ ${r.time}</div>
     </div>`).join('');
@@ -561,34 +539,25 @@ function createSentimentChart(pos, neg, neu) {
   if (window.sentimentChartInstance) window.sentimentChartInstance.destroy();
   window.sentimentChartInstance = new Chart(ctx, {
     type: 'doughnut',
-    data: {
-      labels: ['😊 Positive', '😞 Negative', '😐 Neutral'],
-      datasets: [{ data: [pos, neg, neu], backgroundColor: ['#30D158','#FF453A','#FFD60A'], borderWidth: 2 }]
-    },
+    data: { labels:['😊 Positive','😞 Negative','😐 Neutral'], datasets:[{ data:[pos,neg,neu], backgroundColor:['#30D158','#FF453A','#FFD60A'], borderWidth:2 }] },
     options: { responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{size:12,weight:'bold'}, padding:15 } } } }
   });
 }
 
 function createRatingChart(reviews) {
-  const ratingCounts = [0,0,0,0,0];
-  reviews.forEach(r => { if(r.stars>=1&&r.stars<=5) ratingCounts[r.stars-1]++; });
+  const rc = [0,0,0,0,0];
+  reviews.forEach(r => { if(r.stars>=1&&r.stars<=5) rc[r.stars-1]++; });
   const ctx = document.getElementById('ratingChart').getContext('2d');
   if (window.ratingChartInstance) window.ratingChartInstance.destroy();
   window.ratingChartInstance = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels: ['1 ⭐','2 ⭐','3 ⭐','4 ⭐','5 ⭐'],
-      datasets: [{ data: ratingCounts, backgroundColor:['#FF453A','#FF9500','#FFD60A','#34C759','#30D158'], borderRadius:8 }]
-    },
+    data: { labels:['1 ⭐','2 ⭐','3 ⭐','4 ⭐','5 ⭐'], datasets:[{ data:rc, backgroundColor:['#FF453A','#FF9500','#FFD60A','#34C759','#30D158'], borderRadius:8 }] },
     options: { responsive:true, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}}} }
   });
 }
 
 async function clearAll() {
-  if (confirm('Delete all reviews?')) {
-    await remove(reviewsRef);
-    renderDash();
-  }
+  if (confirm('Delete all reviews?')) { await remove(reviewsRef); renderDash(); }
 }
 window.clearAll = clearAll;
 </script>

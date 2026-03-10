@@ -337,31 +337,71 @@ body { font-family: -apple-system,'SF Pro Display','Segoe UI',sans-serif; backgr
 <!-- FLOATING DASHBOARD BUTTON -->
 <button id="dashBtn" onclick="openDash()">📊 Dashboard</button>
 
-<script>
-const RK = 'iphone17_reviews';
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ✅ استبدل هذه القيم بقيمك من Firebase Console
+const firebaseConfig = {
+  apiKey: "REPLACE_YOUR_API_KEY",
+  authDomain: "REPLACE.firebaseapp.com",
+  databaseURL: "https://REPLACE-default-rtdb.firebaseio.com",
+  projectId: "REPLACE",
+  storageBucket: "REPLACE.appspot.com",
+  messagingSenderId: "REPLACE",
+  appId: "REPLACE"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const reviewsRef = ref(db, 'iphone17_reviews');
+
 const ADMIN_PWD = '12345';
 let selEmojiData = null, selStars = 0, selAspects = [];
+let allReviews = [];
+
+// 🔴 Real-time listener — يحدّث فور وصول تعليق جديد من أي طالب
+onValue(reviewsRef, (snapshot) => {
+  allReviews = [];
+  if (snapshot.exists()) {
+    snapshot.forEach(child => {
+      allReviews.push({ id: child.key, ...child.val() });
+    });
+  }
+  renderMainReviews();
+  // إذا كانت لوحة التحكم مفتوحة، حدّثها تلقائياً
+  if (document.getElementById('dashView').style.display === 'block') {
+    renderDash();
+  }
+});
 
 function selEmoji(el, e, l) {
   document.querySelectorAll('.e-btn').forEach(b => b.classList.remove('sel'));
   el.classList.add('sel');
   selEmojiData = {e, l};
 }
+window.selEmoji = selEmoji;
+
 function selStar(n) {
   selStars = n;
   document.querySelectorAll('.star').forEach((s,i) => s.classList.toggle('on', i < n));
 }
+window.selStar = selStar;
+
 function togAsp(el) {
   el.classList.toggle('sel');
   const t = el.textContent.trim();
   if (el.classList.contains('sel')) selAspects.push(t);
   else selAspects = selAspects.filter(a => a !== t);
 }
+window.togAsp = togAsp;
+
 function updChar() {
   const v = document.getElementById('revText').value;
   document.getElementById('charN').textContent = v.length;
   document.getElementById('charHint').textContent = '';
 }
+window.updChar = updChar;
 
 function analyzeSentiment(text, stars, emoji) {
   const pos = ['amazing','excellent','great','good','love','best','fantastic','wonderful',
@@ -386,7 +426,7 @@ function analyzeSentiment(text, stars, emoji) {
   return {label:'Neutral', emoji:'😐', cls:'neu'};
 }
 
-function doSubmit() {
+async function doSubmit() {
   const text = document.getElementById('revText').value.trim();
   if (!selEmojiData) { alert('Please select how you feel!'); return; }
   if (!selStars)     { alert('Please give a star rating!'); return; }
@@ -394,11 +434,18 @@ function doSubmit() {
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Analyzing sentiment...';
-  setTimeout(() => {
+  setTimeout(async () => {
     const s = analyzeSentiment(text, selStars, selEmojiData);
-    const reviews = JSON.parse(localStorage.getItem(RK) || '[]');
-    reviews.push({ text, stars: selStars, emoji: selEmojiData, aspects: [...selAspects], sentiment: s.label, cls: s.cls, time: new Date().toLocaleTimeString() });
-    localStorage.setItem(RK, JSON.stringify(reviews));
+    // ✅ احفظ في Firebase بدلاً من localStorage
+    await push(reviewsRef, {
+      text,
+      stars: selStars,
+      emoji: selEmojiData,
+      aspects: [...selAspects],
+      sentiment: s.label,
+      cls: s.cls,
+      time: new Date().toLocaleTimeString()
+    });
     const bc = s.cls === 'pos' ? 's-pos' : s.cls === 'neg' ? 's-neg' : 's-neu';
     document.getElementById('sResult').innerHTML = `<div class="s-badge ${bc}">${s.emoji} ${s.label} Sentiment Detected</div>`;
     btn.disabled = false;
@@ -406,9 +453,9 @@ function doSubmit() {
     document.getElementById('mainView').style.display = 'none';
     document.getElementById('dashBtn').style.display = 'none';
     document.getElementById('successView').style.display = 'flex';
-    updateMainReviews();
   }, 1600);
 }
+window.doSubmit = doSubmit;
 
 function resetForm() {
   selEmojiData = null; selStars = 0; selAspects = [];
@@ -421,22 +468,24 @@ function resetForm() {
   document.getElementById('successView').style.display = 'none';
   document.getElementById('dashBtn').style.display = 'block';
   window.scrollTo(0,0);
-  updateMainReviews();
 }
+window.resetForm = resetForm;
 
 function openDash() {
   document.getElementById('loginView').style.display = 'flex';
 }
+window.openDash = openDash;
 
 function closePwd() {
   document.getElementById('loginView').style.display = 'none';
   document.getElementById('pwdInput').value = '';
 }
+window.closePwd = closePwd;
 
 function checkPassword() {
   const pwd = document.getElementById('pwdInput').value;
   if (pwd === ADMIN_PWD) {
-    loadDash();
+    renderDash();
     document.getElementById('mainView').style.display = 'none';
     document.getElementById('successView').style.display = 'none';
     document.getElementById('dashView').style.display = 'block';
@@ -448,28 +497,27 @@ function checkPassword() {
     document.getElementById('pwdInput').value = '';
   }
 }
+window.checkPassword = checkPassword;
 
 function closeDash() {
   document.getElementById('dashView').style.display = 'none';
   document.getElementById('mainView').style.display = 'block';
   document.getElementById('dashBtn').style.display = 'block';
 }
+window.closeDash = closeDash;
 
-function loadDash() {
-  const reviews = JSON.parse(localStorage.getItem(RK) || '[]');
+function renderDash() {
+  const reviews = allReviews;
   const total = reviews.length;
   const pos   = reviews.filter(r => r.cls === 'pos').length;
   const neg   = reviews.filter(r => r.cls === 'neg').length;
   const neu   = reviews.filter(r => r.cls === 'neu').length;
-  
   document.getElementById('dTotal').textContent = total;
   document.getElementById('dPos').textContent   = pos;
   document.getElementById('dNeg').textContent   = neg;
-  
   const avg = total ? (reviews.reduce((s,r) => s+r.stars, 0)/total).toFixed(1) : null;
   document.getElementById('avgR').textContent = avg || '—';
   document.getElementById('avgS').textContent = avg ? '⭐'.repeat(Math.round(avg)) : '';
-  
   const cont = document.getElementById('rList');
   if (!total) { cont.innerHTML = '<div class="empty"><span>📭</span><p>No reviews yet. Share this page with students!</p></div>'; return; }
   cont.innerHTML = [...reviews].reverse().map(r => `
@@ -483,93 +531,17 @@ function loadDash() {
       <p>${r.text}</p>
       <div class="r-time">⏰ ${r.time}</div>
     </div>`).join('');
-  
-  // Create Charts
   createSentimentChart(pos, neg, neu);
   createRatingChart(reviews);
 }
 
-function createSentimentChart(pos, neg, neu) {
-  const ctx = document.getElementById('sentimentChart').getContext('2d');
-  if (window.sentimentChartInstance) window.sentimentChartInstance.destroy();
-  
-  window.sentimentChartInstance = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['😊 Positive', '😞 Negative', '😐 Neutral'],
-      datasets: [{
-        data: [pos, neg, neu],
-        backgroundColor: ['#30D158', '#FF453A', '#FFD60A'],
-        borderColor: ['#30D158', '#FF453A', '#FFD60A'],
-        borderWidth: 2
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: {
-            font: { size: 12, weight: 'bold' },
-            padding: 15
-          }
-        }
-      }
-    }
-  });
-}
-
-function createRatingChart(reviews) {
-  const ratingCounts = [0, 0, 0, 0, 0];
-  reviews.forEach(r => {
-    if (r.stars >= 1 && r.stars <= 5) {
-      ratingCounts[r.stars - 1]++;
-    }
-  });
-  
-  const ctx = document.getElementById('ratingChart').getContext('2d');
-  if (window.ratingChartInstance) window.ratingChartInstance.destroy();
-  
-  window.ratingChartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['1 ⭐', '2 ⭐', '3 ⭐', '4 ⭐', '5 ⭐'],
-      datasets: [{
-        label: 'Count',
-        data: ratingCounts,
-        backgroundColor: ['#FF453A', '#FF9500', '#FFD60A', '#34C759', '#30D158'],
-        borderColor: ['#FF453A', '#FF9500', '#FFD60A', '#34C759', '#30D158'],
-        borderWidth: 2,
-        borderRadius: 8
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      indexAxis: 'y',
-      plugins: {
-        legend: { display: false }
-      },
-      scales: {
-        x: {
-          beginAtZero: true,
-          ticks: { stepSize: 1 }
-        }
-      }
-    }
-  });
-}
-
-function updateMainReviews() {
-  const reviews = JSON.parse(localStorage.getItem(RK) || '[]');
+function renderMainReviews() {
+  const reviews = allReviews;
   const cont = document.getElementById('mainReviewsList');
-  
   if (reviews.length === 0) {
     document.getElementById('mainReviews').style.display = 'none';
     return;
   }
-  
   document.getElementById('mainReviews').style.display = 'block';
   cont.innerHTML = [...reviews].reverse().map(r => `
     <div class="r-item ${r.cls}">
@@ -584,12 +556,41 @@ function updateMainReviews() {
     </div>`).join('');
 }
 
-function clearAll() {
-  if (confirm('Delete all reviews?')) { localStorage.removeItem(RK); loadDash(); updateMainReviews(); }
+function createSentimentChart(pos, neg, neu) {
+  const ctx = document.getElementById('sentimentChart').getContext('2d');
+  if (window.sentimentChartInstance) window.sentimentChartInstance.destroy();
+  window.sentimentChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['😊 Positive', '😞 Negative', '😐 Neutral'],
+      datasets: [{ data: [pos, neg, neu], backgroundColor: ['#30D158','#FF453A','#FFD60A'], borderWidth: 2 }]
+    },
+    options: { responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{size:12,weight:'bold'}, padding:15 } } } }
+  });
 }
 
-// Load reviews on page load
-document.addEventListener('DOMContentLoaded', updateMainReviews);
+function createRatingChart(reviews) {
+  const ratingCounts = [0,0,0,0,0];
+  reviews.forEach(r => { if(r.stars>=1&&r.stars<=5) ratingCounts[r.stars-1]++; });
+  const ctx = document.getElementById('ratingChart').getContext('2d');
+  if (window.ratingChartInstance) window.ratingChartInstance.destroy();
+  window.ratingChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['1 ⭐','2 ⭐','3 ⭐','4 ⭐','5 ⭐'],
+      datasets: [{ data: ratingCounts, backgroundColor:['#FF453A','#FF9500','#FFD60A','#34C759','#30D158'], borderRadius:8 }]
+    },
+    options: { responsive:true, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}}} }
+  });
+}
+
+async function clearAll() {
+  if (confirm('Delete all reviews?')) {
+    await remove(reviewsRef);
+    renderDash();
+  }
+}
+window.clearAll = clearAll;
 </script>
 </body>
 </html>
